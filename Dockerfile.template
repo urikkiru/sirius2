@@ -1,0 +1,17 @@
+FROM ubuntu:18.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -y update && apt-get -y upgrade
+RUN apt-get -y install screen tmux htop nano python3-pip apt-utils iputils-ping \
+					   openssh-server pigz software-properties-common openjdk-8-jdk
+
+RUN groupadd -r -g {{ gid }} minecraft && useradd -u {{ uid }} -r -m -g minecraft minecraft
+RUN echo "buildallthethings\nbuildallthethings" | passwd minecraft
+
+#COPY serverControl.py /home/minecraft/
+#COPY runServers.sh /home/minecraft/
+
+#VOLUME ["/home/minecraft/serversVolume"]
+#VOLUME ["/home/minecraft/instanceDir"]
+VOLUME ["/minecraft"]
