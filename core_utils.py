@@ -54,6 +54,15 @@ def unzipFile(filename, targetFolder):
    if myProc.returncode >= 2:
        raise RuntimeError('Unzip of {} -> {} failed.'.format(filename, targetFolder))
 
+def syncFolder(srcFolder, dstFolder, destRsyncPath=''):
+    command = ['rsync']
+    if destRsyncPath:
+        command += ['--rsync-path', destRsyncPath]
+    command += ['-avuhP', '--delete', '-e', 'ssh', srcFolder, dstFolder]
+    myProc = subprocess.run(command, stderr=subprocess.STDOUT)
+    if myProc.returncode != 0:
+        raise RuntimeError('Folder Sync {} -> {} failed'.format(srcFolder, dstFolder))
+
 def updateConfig(filename, data):
     with open(filename, 'r', encoding='utf-8') as confFile:
         confLines = confFile.readlines()

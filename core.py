@@ -9,7 +9,9 @@ from jinja2 import Template
 from mcrcon import MCRcon
 import yaml
 
-from core_utils import downloadFile, setupLogging, unzipFile, resetPermissions, updateConfig, createEULA, getServerProperies
+from core_utils import (
+    downloadFile, setupLogging, unzipFile, resetPermissions, updateConfig, createEULA, getServerProperies, syncFolder
+)
 
 
 log = setupLogging()
@@ -181,6 +183,11 @@ class Core:
         else:
             log.error('rcon disabled for this server instance')
 
+    def syncbackups(self, name, dest, remoteRsyncPath=None):
+        srcFolder = os.path.join(self.config.instanceFolder, name, 'backups')
+        dstFolder = os.path.join(dest, name)
+        log.info('Syncing Backups {} -> {}'.format(srcFolder, dstFolder))
+        syncFolder(srcFolder, dstFolder, remoteRsyncPath)
 
 
 if __name__ == '__main__':
