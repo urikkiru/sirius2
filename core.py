@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import datetime
 import glob
 import os
 import shutil
+import subprocess
 
 import docker
 import fire
@@ -105,9 +107,6 @@ class Core:
         log.info('Creating eula.txt')
         createEULA(instanceFolder)
 
-    def upgrade(self, name):
-        pass
-
     def start(self, name):
         log.info('Starting {}'.format(name))
 
@@ -169,6 +168,37 @@ class Core:
         self.download(name)
         self.configure(name)
         #self.start(name)
+
+    def upgrade(self, name):
+        myInstanceFolder = os.path.join(self.config.instanceFolder, name)
+        upgradeList = self.data[name]['upgradeList']
+
+        zipList = glob.glob(os.path.join(myInstanceFolder, '*.zip'))
+        if len(zipList) != 1:
+            raise FileNotFoundError('Unable to discern current instance name and version from the .zip file.')
+
+        baseName = os.path.basename(zipList[0])
+        rotateName = os.path.splitext(baseName)[0]
+        timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%m-%d-%Y_%H.%M.%S")
+        oldFolderPath = os.path.join(self.config.instanceFolder, '{}_{}'.format(rotateName, timestamp))
+        log.info('Renaming {} -> {}'.format(myInstanceFolder, oldFolderPath))
+        shutil.move(myInstanceFolder, oldFolderPath)
+
+        self.download(name)
+        self.configure(name)
+
+        for uRef in upgradeList:
+            mySrc = os.path.join(oldFolderPath, uRef)
+            if not os.path.exists(mySrc):
+                raise FileNotFoundError(mySrc)
+            myDst = os.path.join(myInstanceFolder, uRef)
+            log.info("Copying {} -> {}".format(mySrc, myDst))
+            if os.path.isdir(mySrc):
+                shutil.copytree(mySrc, myDst)
+            else:
+                shutil.copy(mySrc, myDst)
+
+        log.info('Upgrade complete')
 
     def exec(self, name, commStr):
         if not commStr.startswith('/'):
