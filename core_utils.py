@@ -113,7 +113,6 @@ def getServerProperies(targetFolder):
 
     return retData
 
-
 if __name__ == '__main__':
     #myFilename = downloadFile('https://media.forgecdn.net/files/2744/435/Enigmatica2Server-1.69a.zip')
     #print(myFilename)

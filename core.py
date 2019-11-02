@@ -167,7 +167,28 @@ class Core:
         self.build()
         self.download(name)
         self.configure(name)
+        self.install_mods(name)
         #self.start(name)
+
+    def install_mods(self, name):
+        instanceFolder = os.path.join(self.config.instanceFolder, name)
+        disableList = self.data[name]['modsList']['disable']
+        modsList = self.data[name]['modsList']['install']
+
+        if disableList:
+            print('Disabling Mods:')
+            for dRef in disableList:
+                modFilename = os.path.join(instanceFolder, 'mods', dRef)
+                disabledFilename = modFilename + '.disabled'
+                if os.path.exists(modFilename):
+                    log.info('-- Renaming {} to {}'.format(modFilename, disabledFilename))
+                    os.rename(modFilename, disabledFilename)
+
+        if modsList:
+            print('Installing Mods:')
+            for mRef in modsList:
+                log.info('-- {}'.format(mRef))
+                downloadFile(mRef, os.path.join(instanceFolder, 'mods'))
 
     def upgrade(self, name):
         myInstanceFolder = os.path.join(self.config.instanceFolder, name)
