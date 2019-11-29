@@ -1,3 +1,4 @@
+import collections.abc
 import logging
 import os
 import re
@@ -5,6 +6,8 @@ import subprocess
 
 import coloredlogs
 import requests
+# import yaml
+from ruamel.yaml import YAML
 
 def setupLogging(logname=__name__, level=logging.DEBUG, logFormat='%(asctime)s [%(levelname)s] %(message)s'):
     myLog = logging.getLogger(logname)
@@ -88,6 +91,37 @@ def updateConfig(filename, data):
             if not key in keyMap:
                 confFile.write("{}={}\n".format(key, value))
 
+# def updateYaml(filename, data):
+#     with open(filename, 'r', encoding='utf-8') as yamlFile:
+#         yamlData = yaml.load(yamlFile, Loader=yaml.FullLoader)
+#
+#     yamlData.update(data)
+#
+#     with open(filename, 'w', encoding='utf-8') as yamlFile:
+#         yamlFile.write(yaml.dump(yamlData))
+
+
+def updateDict(baseData, updateData):
+    for key, value in updateData.items():
+        if isinstance(value, collections.abc.Mapping):
+            baseData[key] = updateDict(baseData.get(key, {}), value)
+        else:
+            baseData[key] = value
+
+    return baseData
+
+def updateYaml(filename, data):
+    yaml = YAML()
+    print(filename)
+    with open(filename, 'r', encoding='utf-8') as yamlFile:
+        yamlData = yaml.load(yamlFile)
+
+        updateDict(yamlData, data)
+
+        with open(filename, 'w', encoding='utf-8') as outputFile:
+            yaml.dump(yamlData, outputFile)
+            # outputFile.write(yaml.dump(yamlData))
+
 
 def createEULA(folder):
     myFilename = os.path.join(folder, 'eula.txt')
@@ -112,6 +146,20 @@ def getServerProperies(targetFolder):
                 retData[key] = value
 
     return retData
+
+def convertFileToUnixLineEndings(filename):
+    winLineEnding = b'\r\n'
+    unixLineEnding = b'\n'
+
+    print('Converting line endings {}'.format(filename))
+
+    with open(filename, 'rb') as inputFile:
+        rawData = inputFile.read()
+
+    rawData = rawData.replace(winLineEnding, unixLineEnding)
+
+    with open(filename, 'wb') as outputFile:
+        outputFile.write(rawData)
 
 if __name__ == '__main__':
     #myFilename = downloadFile('https://media.forgecdn.net/files/2744/435/Enigmatica2Server-1.69a.zip')

@@ -12,7 +12,16 @@ from mcrcon import MCRcon
 import yaml
 
 from core_utils import (
-    downloadFile, setupLogging, unzipFile, resetPermissions, updateConfig, createEULA, getServerProperies, syncFolder
+    downloadFile,
+    setupLogging,
+    unzipFile,
+    resetPermissions,
+    updateConfig,
+    updateYaml,
+    createEULA,
+    getServerProperies,
+    syncFolder,
+    convertFileToUnixLineEndings,
 )
 
 
@@ -98,11 +107,23 @@ class Core:
 
     def configure(self, name):
         instanceFolder = os.path.join(self.config.instanceFolder, name)
+
+        propsFilepath = os.path.join(instanceFolder, 'server.properties')
+        if not os.path.exists(propsFilepath):
+            shutil.copy('server.properties.template', propsFilepath)
+
         for filename, data in self.data[name]['configs'].items():
-            log.info('Patching {}'.format(filename))
+            log.info('Patching config {}'.format(filename))
 
             fullFilename = os.path.join(instanceFolder, filename)
             updateConfig(fullFilename, data)
+
+        for filename in self.data[name]['yamls']:
+            data = self.data[name]['yamls'][filename]
+            log.info('Patching yaml {}'.format(filename))
+
+            fullFilename = os.path.join(instanceFolder, filename)
+            updateYaml(fullFilename, data)
 
         log.info('Creating eula.txt')
         createEULA(instanceFolder)
@@ -112,6 +133,7 @@ class Core:
 
         instanceFolder = os.path.join(self.config.instanceFolder, name)
         startCommand = os.path.join(self.config.mountpoint, self.data[name]['entrypoint'])
+        convertFileToUnixLineEndings(os.path.join(instanceFolder, self.data[name]['entrypoint']))
         port = self.data[name]['port']
         rconport = self.data[name].get('rconport')
         print(startCommand)
