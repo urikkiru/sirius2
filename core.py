@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import datetime
+from distutils.dir_util import copy_tree
 import glob
 import os
 import shutil
@@ -86,24 +87,36 @@ class Core:
         self.client.images.build(path=targetFolder, nocache=nocache, tag='{}:latest'.format(self.config.imageName))
 
     def download(self, name):
-        url = self.data[name]['url']
         instanceFolder = os.path.join(self.config.instanceFolder, name)
-
         if os.path.exists(instanceFolder):
             raise FileExistsError('Instance folder "{}" already exists'.format(instanceFolder))
-
         os.mkdir(instanceFolder)
 
-        log.info('[{}] Downloading {}'.format(name, url))
-        myFilename = downloadFile(url, instanceFolder)
+        patchData = self.data[name].get('patch')
+        if patchData:
+            # log.info('Patch data found, copying previous folder')
+            # copy_tree(oldFolderPath, instanceFolder)
+            log.info('Patch data found')
 
-        log.info('Download Complete, extracting: {}'.format(myFilename))
-        unzipFile(myFilename, instanceFolder)
+            patchURL = patchData['url']
+            baseFolder = patchData.get('basefolder')
+            patchFolder = os.path.join(instanceFolder, 'patches')
 
-        log.info('Resetting file permissions')
-        resetPermissions(instanceFolder)
+            log.info('[{}] Downloading Patch {} -> {}'.format(name, patchURL, patchFolder))
+            patchFilename = downloadFile(patchURL, folder=patchFolder)
+            unzipFile(patchFilename, patchFolder)
 
-        os.chmod(os.path.join(instanceFolder, self.data[name]['entrypoint']), 0o0755)
+            realPatchFolder = os.path.join(patchFolder, baseFolder)
+            log.info('[{}] Moving Patch Files {} -> {}'.format(name, os.path.join(realPatchFolder, baseFolder), instanceFolder))
+            copy_tree(realPatchFolder, instanceFolder)
+        else:
+            url = self.data[name]['url']
+
+            log.info('[{}] Downloading {}'.format(name, url))
+            myFilename = downloadFile(url, folder=instanceFolder)
+
+            log.info('Download Complete, extracting: {}'.format(myFilename))
+            unzipFile(myFilename, instanceFolder)
 
     def configure(self, name):
         instanceFolder = os.path.join(self.config.instanceFolder, name)
@@ -118,15 +131,22 @@ class Core:
             fullFilename = os.path.join(instanceFolder, filename)
             updateConfig(fullFilename, data)
 
-        for filename in self.data[name]['yamls']:
-            data = self.data[name]['yamls'][filename]
-            log.info('Patching yaml {}'.format(filename))
+        yamlData = self.data[name].get('yamls')
+        if yamlData:
+            for filename in yamlData:
+                data = yamlData[filename]
+                log.info('Patching yaml {}'.format(filename))
 
-            fullFilename = os.path.join(instanceFolder, filename)
-            updateYaml(fullFilename, data)
+                fullFilename = os.path.join(instanceFolder, filename)
+                updateYaml(fullFilename, data)
 
         log.info('Creating eula.txt')
         createEULA(instanceFolder)
+
+        log.info('Resetting file permissions')
+        resetPermissions(instanceFolder)
+
+        os.chmod(os.path.join(instanceFolder, self.data[name]['entrypoint']), 0o0755)
 
     def start(self, name):
         log.info('Starting {}'.format(name))
@@ -188,8 +208,8 @@ class Core:
     def install(self, name):
         self.build()
         self.download(name)
-        self.configure(name)
         self.install_mods(name)
+        self.configure(name)
         #self.start(name)
 
     def install_mods(self, name):
@@ -213,33 +233,30 @@ class Core:
                 downloadFile(mRef, os.path.join(instanceFolder, 'mods'))
 
     def upgrade(self, name):
-        myInstanceFolder = os.path.join(self.config.instanceFolder, name)
+        instanceFolder = os.path.join(self.config.instanceFolder, name)
         upgradeList = self.data[name]['upgradeList']
 
-        zipList = glob.glob(os.path.join(myInstanceFolder, '*.zip'))
-        if len(zipList) != 1:
-            raise FileNotFoundError('Unable to discern current instance name and version from the .zip file.')
-
-        baseName = os.path.basename(zipList[0])
-        rotateName = os.path.splitext(baseName)[0]
+        rotateName = name
         timestamp = datetime.datetime.strftime(datetime.datetime.now(), "%m-%d-%Y_%H.%M.%S")
         oldFolderPath = os.path.join(self.config.instanceFolder, '{}_{}'.format(rotateName, timestamp))
-        log.info('Renaming {} -> {}'.format(myInstanceFolder, oldFolderPath))
-        shutil.move(myInstanceFolder, oldFolderPath)
+        log.info('Renaming {} -> {}'.format(instanceFolder, oldFolderPath))
+        shutil.move(instanceFolder, oldFolderPath)
 
         self.download(name)
-        self.configure(name)
+        self.install_mods(name)
 
         for uRef in upgradeList:
             mySrc = os.path.join(oldFolderPath, uRef)
             if not os.path.exists(mySrc):
                 raise FileNotFoundError(mySrc)
-            myDst = os.path.join(myInstanceFolder, uRef)
+            myDst = os.path.join(instanceFolder, uRef)
             log.info("Copying {} -> {}".format(mySrc, myDst))
             if os.path.isdir(mySrc):
                 shutil.copytree(mySrc, myDst)
             else:
                 shutil.copy(mySrc, myDst)
+
+        self.configure(name)
 
         log.info('Upgrade complete')
 
